@@ -1,0 +1,264 @@
+"use client";
+
+import React, { useState, useRef, useLayoutEffect, FormEvent, ChangeEvent } from 'react';
+import gsap from 'gsap';
+import { createClient } from '@supabase/supabase-js';
+import Navbar from '@/components/Navbar'; // Adjusted path for Next.js
+
+// --- 1. SAFE SUPABASE INIT (Next.js Env Vars) ---
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+const supabase = (supabaseUrl && supabaseKey) 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
+
+// Helper to avoid SSR warnings with useLayoutEffect
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : React.useEffect;
+
+export default function ContactPage() {
+  // STATES
+  const [viewState, setViewState] = useState<'selection' | 'form' | 'success'>('selection'); 
+  const [formType, setFormType] = useState<'general' | 'service' | null>(null); 
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // --- ANIMATION: ENTRY ---
+  useIsomorphicLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo(".animate-entry", 
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.8, stagger: 0.1, ease: "power3.out" }
+      );
+    }, containerRef);
+    return () => ctx.revert();
+  }, [viewState]);
+
+  // --- HANDLERS ---
+  const handleInput = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const submitForm = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    // Graceful fallback if Supabase isn't configured yet
+    if (!supabase) {
+        console.warn("Supabase keys missing in .env.local");
+        // Simulate loading for effect
+        setLoading(true);
+        setTimeout(() => {
+            setLoading(false);
+            setViewState('success');
+        }, 1500);
+        return;
+    }
+
+    setLoading(true);
+    try {
+      const table = formType === 'general' ? 'general_inquiries' : 'service_requests';
+      const { error } = await supabase.from(table).insert([formData]);
+      if (error) throw error;
+      setViewState('success');
+    } catch (err) {
+      console.error(err);
+      alert("Error submitting. Please try again.");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const switchView = (type: 'general' | 'service') => {
+    gsap.to(containerRef.current, {
+        opacity: 0, 
+        duration: 0.3, 
+        onComplete: () => {
+            setFormType(type);
+            setViewState('form');
+            setFormData({});
+            gsap.to(containerRef.current, { opacity: 1, duration: 0.5 });
+        }
+    });
+  };
+
+  // --- RENDER: SUCCESS ---
+  if (viewState === 'success') {
+    return (
+      <div className="min-h-screen w-full bg-[#0a0a0a] text-[#EAE8E4] flex flex-col items-center justify-center p-6">
+        <Navbar />
+        <h1 className="font-serif text-6xl md:text-[10vw] italic leading-none text-[#4a0404] mb-8 animate-pulse text-center">Received.</h1>
+        <p className="font-mono text-xs md:text-sm tracking-[0.2em] md:tracking-[0.4em] uppercase opacity-60 text-center">The Maison has your brief.</p>
+        <button onClick={() => window.location.reload()} className="mt-12 border-b border-white/30 pb-1 hover:text-[#4a0404] hover:border-[#4a0404] transition-colors font-mono text-xs uppercase tracking-widest">
+            Return
+        </button>
+      </div>
+    );
+  }
+
+  // --- RENDER: SELECTION (The Fork) ---
+  if (viewState === 'selection') {
+    return (
+      <div ref={containerRef} className="min-h-screen w-full bg-[#EAE8E4] text-[#0a0a0a] flex flex-col relative overflow-x-hidden">
+        <Navbar />
+        <div className="fixed inset-0 pointer-events-none opacity-[0.06] mix-blend-multiply" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/noise-lines.png")` }}></div>
+        
+        <div className="flex-1 flex flex-col justify-center items-center gap-12 z-10 px-6 py-20">
+            <div className="animate-entry text-center mb-4 md:mb-12">
+                <p className="font-mono text-[10px] tracking-[0.3em] md:tracking-[0.4em] uppercase text-[#4a0404] mb-4 font-bold">Initialize Protocol</p>
+                <h1 className="font-serif text-4xl md:text-6xl italic">Select Your Path</h1>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-12 md:gap-24 w-full md:w-auto">
+                {/* OPTION 1 */}
+                <button onClick={() => switchView('general')} className="animate-entry group text-center w-full md:w-auto">
+                    <div className="text-3xl md:text-5xl font-serif mb-4 group-hover:text-[#4a0404] transition-colors duration-500">Just Saying Hello</div>
+                    <div className="h-[1px] w-12 md:w-0 bg-[#4a0404] mx-auto group-hover:w-full transition-all duration-500"></div>
+                    <span className="block mt-4 font-mono text-[9px] tracking-widest opacity-60 md:opacity-40 group-hover:opacity-100">01. General Inquiry</span>
+                </button>
+                
+                <div className="w-full h-[1px] md:w-[1px] md:h-12 bg-[#0a0a0a]/10 animate-entry"></div>
+                
+                {/* OPTION 2 */}
+                <button onClick={() => switchView('service')} className="animate-entry group text-center w-full md:w-auto">
+                    <div className="text-3xl md:text-5xl font-serif mb-4 group-hover:text-[#4a0404] transition-colors duration-500">Start a Project</div>
+                    <div className="h-[1px] w-12 md:w-0 bg-[#4a0404] mx-auto group-hover:w-full transition-all duration-500"></div>
+                    <span className="block mt-4 font-mono text-[9px] tracking-widest opacity-60 md:opacity-40 group-hover:opacity-100">02. Commission Work</span>
+                </button>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER: THE NARRATIVE FORM (Mad-Libs) ---
+  return (
+    <div ref={containerRef} className="min-h-screen w-full bg-[#EAE8E4] text-[#0a0a0a] relative overflow-x-hidden">
+      <Navbar />
+      
+      {/* TEXTURE */}
+      <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.06] mix-blend-multiply" 
+           style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/noise-lines.png")` }}></div>
+
+      <div className="relative z-10 pt-28 md:pt-32 pb-24 px-6 md:px-12 lg:px-24 min-h-screen flex flex-col justify-center">
+        
+        {/* HEADER */}
+        <div className="animate-entry mb-8 md:mb-16 border-b border-[#0a0a0a]/10 pb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+            <span className="font-mono text-[10px] tracking-[0.3em] md:tracking-[0.4em] uppercase text-[#4a0404]">
+                {formType === 'general' ? '01 // General Inquiry' : '02 // Service Brief'}
+            </span>
+            <button onClick={() => setViewState('selection')} className="font-mono text-[9px] uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity border-b border-[#0a0a0a] md:border-none pb-1 md:pb-0">
+                ( Switch Path )
+            </button>
+        </div>
+
+        {/* THE NARRATIVE FORM */}
+        <form onSubmit={submitForm} className="animate-entry max-w-6xl mx-auto leading-[1.8] md:leading-[1.6]">
+            
+            {formType === 'general' ? (
+                // --- GENERAL TEMPLATE ---
+                <div className="font-serif text-2xl md:text-4xl lg:text-[3.5vw] text-[#0a0a0a]">
+                    <span>Hello, my name is</span>
+                    <input 
+                        name="full_name" required placeholder="your full name" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[300px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    />
+                    <span>. You can reach me at</span>
+                    <input 
+                        name="email" type="email" required placeholder="email address" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[350px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    />
+                    <span>. I am writing to you today regarding</span>
+                    <input 
+                        name="subject" placeholder="subject matter" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[400px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    />
+                    <span>.</span>
+                    <br /><br />
+                    <span className="block opacity-40 text-sm md:text-xl font-mono uppercase tracking-widest mb-4 mt-4">Message:</span>
+                    <textarea 
+                        name="message" required placeholder="Type your full message here..." onChange={handleInput} rows={4}
+                        className="w-full bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 resize-none text-xl md:text-3xl leading-relaxed"
+                    />
+                </div>
+            ) : (
+                // --- SERVICE TEMPLATE ---
+                <div className="font-serif text-2xl md:text-4xl lg:text-[3.5vw] text-[#0a0a0a]">
+                    <span>Hello, I represent</span>
+                    <input 
+                        name="client_name" required placeholder="Company / Client Name" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[350px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    />
+                    <span>. Our website is</span> 
+                    <input 
+                        name="company_url" placeholder="https:// (optional)" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[300px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    />
+                    <span>.</span>
+                    <br className="hidden md:block" /><br className="hidden md:block" />
+                    <span>We are looking to commission a</span>
+                    <input 
+                        name="service_type" required placeholder="e.g. Web Architecture" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[400px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    /> 
+                    <span>project. Ideally, the final result should feel</span>
+                    <input 
+                        name="aesthetic_vibe" placeholder="e.g. Minimal & Cinematic" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[400px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    />
+                    <span>.</span>
+                    <br className="hidden md:block" /><br className="hidden md:block" />
+                    <span>Our estimated budget for this undertaking is</span>
+                    <select 
+                        name="budget_bracket" onChange={handleInput} defaultValue=""
+                        className="inline-block w-full md:w-auto md:min-w-[300px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] cursor-pointer appearance-none text-left md:text-center rounded-none mb-2 md:mb-0"
+                    >
+                        <option value="" disabled>Select Range</option>
+                        <option value="$10k - $25k">$10k — $25k</option>
+                        <option value="$25k - $50k">$25k — $50k</option>
+                        <option value="$50k - $100k">$50k — $100k</option>
+                        <option value="$100k+">$100k+</option>
+                    </select>
+                    <span>and we are hoping to launch within</span>
+                    <input 
+                        name="timeline" placeholder="e.g. 3 months" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[250px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    />
+                    <span>.</span>
+                    <br className="hidden md:block" /><br className="hidden md:block" />
+                    <span>You can reach me at</span>
+                    <input 
+                        name="email" type="email" required placeholder="your email address" onChange={handleInput}
+                        className="inline-block w-full md:w-auto md:min-w-[350px] mx-0 md:mx-4 bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 text-left md:text-center transition-colors mb-2 md:mb-0"
+                    /> 
+                    <span>to discuss the details.</span>
+                    <br /><br />
+                    <span className="block opacity-40 text-sm md:text-xl font-mono uppercase tracking-widest mb-4 mt-4">Additional Context / Goals:</span>
+                    <textarea 
+                        name="project_goal" required placeholder="Describe the mission..." onChange={handleInput} rows={3}
+                        className="w-full bg-transparent border-b-2 border-[#0a0a0a]/20 focus:border-[#4a0404] outline-none text-[#4a0404] placeholder:text-[#0a0a0a]/20 resize-none text-xl md:text-3xl leading-relaxed"
+                    />
+                </div>
+            )}
+
+            {/* SUBMIT STAMP */}
+            <div className="mt-16 md:mt-24 flex justify-center pb-20">
+                <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="group relative w-48 h-48 md:w-64 md:h-64 border border-[#0a0a0a]/10 rounded-full flex items-center justify-center overflow-hidden hover:border-[#4a0404] transition-all duration-500"
+                >
+                    <div className="absolute inset-0 bg-[#4a0404] translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[expo.out]"></div>
+                    <div className="relative z-10 text-center group-hover:text-white transition-colors duration-500">
+                        <span className="font-mono text-[9px] md:text-[10px] tracking-[0.3em] uppercase block mb-2">{loading ? "Signing..." : "Authorize"}</span>
+                        <span className="font-serif text-2xl md:text-3xl italic block">Send Brief</span>
+                    </div>
+                </button>
+            </div>
+
+        </form>
+      </div>
+    </div>
+  );
+};
