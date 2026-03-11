@@ -6,8 +6,22 @@ import Navbar from "@/components/Navbar";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "JE Port | Premium Restaurant SaaS",
-  description: "Revolutionizing Kenyan Restaurants through tech.",
+  title: "JE Maison Agency",
+  description: "Revolutionizing businesses through tech advancements in Kenya",
+  icons: {
+    icon: [
+      {
+        media: "(prefers-color-scheme: light)",
+        url: "/logo-white.png",
+        href: "/logo-white.png",
+      },
+      {
+        media: "(prefers-color-scheme: dark)",
+        url: "/logo-dark.png",
+        href: "/logo-dark.png",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
